@@ -1,0 +1,7 @@
+# PostgreSQL
+# ------------------------------------------------------------------------------
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=dverein
+POSTGRES_USER=ddyhinDmamTiOBsmokoXtuxjwimujcQX
+POSTGRES_PASSWORD=tKCHeCKjAh9RDDCHKjgUbf0cnowRmHR3Xhq0gp3NihUj1jNIlLnoGNtBInmwahDM
