@@ -152,9 +152,57 @@ jobs:
         # against the sigstore community Fulcio instance.
         run: echo "${{ steps.meta-nginx.outputs.tags }}" | xargs -I {} cosign sign {}@${{ steps.build-and-push-nginx.outputs.digest }}
 
+      ### POSTGRESQL container
+
+      - name: Cache Docker layers for POSTGRESQL container
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-pg-cache
+          # Key is named differently to avoid collision
+          key: ${{ runner.os }}-multi-buildx-pg-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-multi-buildx-pg
+
+      # Extract metadata (tags, labels) for Docker
+      # https://github.com/docker/metadata-action
+      - name: Extract Docker metadata for POSTGRESQL container
+        id: meta-pg
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-pg
+
+      # Build and push Docker image with Buildx (don't push on PR)
+      # https://github.com/docker/build-push-action
+      - name: Build and push Docker image for POSTGRESQL container
+        id: build-and-push-pg
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: compose/production/postgres/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-pg.outputs.tags }}
+          labels: ${{ steps.meta-pg.outputs.labels }}
+          cache-from: type=local,src=/tmp/.buildx-pg-cache
+          cache-to: type=local,mode=max,dest=/tmp/.buildx-pg-cache-new
+
+      # Sign the resulting Docker image digest except on PRs.
+      # This will only write to the public Rekor transparency log when the Docker
+      # repository is public to avoid leaking data.  If you would like to publish
+      # transparency data even for private images, pass --force to cosign below.
+      # https://github.com/sigstore/cosign
+      - name: Sign the published Docker image for POSTGRESQL container
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        # This step uses the identity token to provision an ephemeral certificate
+        # against the sigstore community Fulcio instance.
+        run: echo "${{ steps.meta-pg.outputs.tags }}" | xargs -I {} cosign sign {}@${{ steps.build-and-push-pg.outputs.digest }}
+
       - name: Move cache
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
           rm -rf /tmp/.buildx-nginx-cache
           mv /tmp/.buildx-nginx-cache-new /tmp/.buildx-nginx-cache
+          rm -rf /tmp/.buildx-pg-cache
+          mv /tmp/.buildx-pg-cache-new /tmp/.buildx-pg-cache
