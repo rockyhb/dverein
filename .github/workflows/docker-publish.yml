@@ -319,14 +319,14 @@ jobs:
 
       - name: Run DB Migrations
         run:  >
-          DJANGO_IMAGE="$(echo \"${{ needs.build.outputs.testimage }}\" | head -1)"
-          POSTGRES_IMAGE="$(echo \"${{ needs.build.outputs.pgimage }}\" | head -1)"
-          NGINX_IMAGE="$(echo \"${{ needs.build.outputs.nginximage }}\" | head -1)"
+          DJANGO_IMAGE=$(echo "${{ needs.build.outputs.testimage }}" | head -1)
+          POSTGRES_IMAGE=$(echo "${{ needs.build.outputs.pgimage }}" | head -1)
+          NGINX_IMAGE=$(echo "${{ needs.build.outputs.nginximage }}" | head -1)
           docker-compose -f ci.yml run --rm django python manage.py migrate
 
       - name: Run Django Tests
         run:  >
-          DJANGO_IMAGE="$(echo \"${{ needs.build.outputs.testimage }}\" | head -1)"
-          POSTGRES_IMAGE="$(echo \"${{ needs.build.outputs.pgimage }}\" | head -1)"
-          NGINX_IMAGE="$(echo \"${{ needs.build.outputs.nginximage }}\" | head -1)"
+          DJANGO_IMAGE=$(echo "${{ needs.build.outputs.testimage }}" | head -1)
+          POSTGRES_IMAGE=$(echo "${{ needs.build.outputs.pgimage }}" | head -1)
+          NGINX_IMAGE=$(echo "${{ needs.build.outputs.nginximage }}" | head -1)
           docker-compose -f ci.yml run django pytest
