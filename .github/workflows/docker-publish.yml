@@ -50,6 +50,9 @@ jobs:
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
 
+    outputs:
+      testimage: "${{ steps.meta-test.outputs.tags }}"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -274,7 +277,7 @@ jobs:
 
       - name: Test
         run: >
-          echo "${{ needs.build.steps.meta-test.outputs.tags }}"
+          echo "${{ needs.build.outputs.testimage }}"
 
       - name: Checkout Code Repository
         uses: actions/checkout@v3
