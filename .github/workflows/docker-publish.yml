@@ -138,7 +138,7 @@ jobs:
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-  build:
+  build-test:
 
     runs-on: ubuntu-latest
     permissions:
@@ -150,8 +150,6 @@ jobs:
 
     outputs:
       testimage: "${{ steps.meta-test.outputs.tags }}"
-      pgimage: "${{ steps.meta-pg.outputs.tags }}"
-      nginximage: "${{ steps.meta-nginx.outputs.tags }}"
 
     steps:
       - name: Checkout repository
@@ -256,8 +254,6 @@ jobs:
       id-token: write
 
     outputs:
-      testimage: "${{ steps.meta-test.outputs.tags }}"
-      pgimage: "${{ steps.meta-pg.outputs.tags }}"
       nginximage: "${{ steps.meta-nginx.outputs.tags }}"
 
     steps:
@@ -288,15 +284,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cache Docker layers
-        uses: actions/cache@v2
-        with:
-          path: /tmp/.buildx-cache
-          # Key is named differently to avoid collision
-          key: ${{ runner.os }}-multi-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-multi-buildx
 
       ### NGINX container
 
@@ -352,12 +339,59 @@ jobs:
         # against the sigstore community Fulcio instance.
         run: echo "${{ steps.meta-nginx.outputs.tags }}" | xargs -I {} cosign sign {}@${{ steps.build-and-push-nginx.outputs.digest }}
 
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+  build-postgres:
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+
+    outputs:
+      pgimage: "${{ steps.meta-pg.outputs.tags }}"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Install the cosign tool except on PR
+      # https://github.com/sigstore/cosign-installer
+      - name: Install cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@main
+        with:
+          cosign-release: 'v1.13.1'
+
+
+      # Workaround: https://github.com/docker/build-push-action/issues/461
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@master
+        with:
+          install: true
+
+      # Login against a Docker registry except on PR
+      # https://github.com/docker/login-action
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       ### POSTGRESQL container
 
       - name: Cache Docker layers for POSTGRESQL container
         uses: actions/cache@v2
         with:
-          path: /tmp/.buildx-pg-cache
+          path: /tmp/.buildx-cache
           # Key is named differently to avoid collision
           key: ${{ runner.os }}-multi-buildx-pg-${{ github.sha }}
           restore-keys: |
@@ -369,7 +403,7 @@ jobs:
         id: meta-pg
         uses: docker/metadata-action@v4
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-pg
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-postgres
           tags: |
             type=schedule,pattern={{date 'YYYYMMDD'}}
             type=semver,pattern={{version}}
@@ -390,8 +424,8 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-pg.outputs.tags }}
           labels: ${{ steps.meta-pg.outputs.labels }}
-          cache-from: type=local,src=/tmp/.buildx-pg-cache
-          cache-to: type=local,mode=max,dest=/tmp/.buildx-pg-cache-new
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,mode=max,dest=/tmp/.buildx-cache-new
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
@@ -410,33 +444,27 @@ jobs:
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-          rm -rf /tmp/.buildx-pg-cache
-          mv /tmp/.buildx-pg-cache-new /tmp/.buildx-pg-cache
 
   pytest:
     runs-on: ubuntu-latest
 
-    needs: [build,build-nginx]
+    needs: [build-test,build-nginx,build-postgres]
 
     steps:
-
-      - name: Test
-        run: >
-          echo "${{ needs.build.outputs.testimage }}"
 
       - name: Checkout Code Repository
         uses: actions/checkout@v3
 
       - name: Run DB Migrations
         run:  >
-          DJANGO_IMAGE=$(echo "${{ needs.build.outputs.testimage }}" | head -1)
-          POSTGRES_IMAGE=$(echo "${{ needs.build.outputs.pgimage }}" | head -1)
-          NGINX_IMAGE=$(echo "${{ needs.build.outputs.nginximage }}" | head -1)
+          DJANGO_IMAGE=$(echo "${{ needs.build-test.outputs.testimage }}" | head -1)
+          POSTGRES_IMAGE=$(echo "${{ needs.build-postgres.outputs.pgimage }}" | head -1)
+          NGINX_IMAGE=$(echo "${{ needs.build-nginx.outputs.nginximage }}" | head -1)
           docker-compose -f ci.yml run --rm django python manage.py migrate
 
       - name: Run Django Tests
         run:  >
-          DJANGO_IMAGE=$(echo "${{ needs.build.outputs.testimage }}" | head -1)
-          POSTGRES_IMAGE=$(echo "${{ needs.build.outputs.pgimage }}" | head -1)
-          NGINX_IMAGE=$(echo "${{ needs.build.outputs.nginximage }}" | head -1)
+          DJANGO_IMAGE=$(echo "${{ needs.build-test.outputs.testimage }}" | head -1)
+          POSTGRES_IMAGE=$(echo "${{ needs.build-postgres.outputs.pgimage }}" | head -1)
+          NGINX_IMAGE=$(echo "${{ needs.build-nginx.outputs.nginximage }}" | head -1)
           docker-compose -f ci.yml run django pytest
