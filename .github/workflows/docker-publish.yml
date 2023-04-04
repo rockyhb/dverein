@@ -23,6 +23,23 @@ env:
 
 
 jobs:
+
+  linter:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout Code Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      # Consider using pre-commit.ci for open source project
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.0
+
+
   build:
 
     runs-on: ubuntu-latest
@@ -247,3 +264,29 @@ jobs:
           mv /tmp/.buildx-nginx-cache-new /tmp/.buildx-nginx-cache
           rm -rf /tmp/.buildx-pg-cache
           mv /tmp/.buildx-pg-cache-new /tmp/.buildx-pg-cache
+
+  pytest:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Test
+        run: >
+          echo "${{ steps.meta-test.outputs.tags }}"
+
+      - name: Checkout Code Repository
+        uses: actions/checkout@v3
+
+      - name: Run DB Migrations
+        run:  >
+          DJANGO_IMAGE=ghcr.io/rockyhb/dverein:main-test
+          POSTGRES_IMAGE=ghcr.io/rockyhb/dverein-pg:main
+          NGINX_IMAGE=ghcr.io/rockyhb/dverein-nginx:main
+          docker-compose -f ci.yml run --rm django python manage.py migrate
+
+      - name: Run Django Tests
+        run:  >
+          DJANGO_IMAGE=ghcr.io/rockyhb/dverein:main-test
+          POSTGRES_IMAGE=ghcr.io/rockyhb/dverein-pg:main
+          NGINX_IMAGE=ghcr.io/rockyhb/dverein-nginx:main
+          docker-compose -f ci.yml run django pytest
