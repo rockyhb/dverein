@@ -41,9 +41,9 @@ jobs:
       # https://github.com/sigstore/cosign-installer
       - name: Install cosign
         if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@f3c664df7af409cb4873aa5068053ba9d61a57b6 #v2.6.0
-        with:
-          cosign-release: 'v1.13.1'
+        uses: sigstore/cosign-installer@main
+        #with:
+        #  cosign-release: 'v1.13.1'
 
 
       # Workaround: https://github.com/docker/build-push-action/issues/461
@@ -65,7 +65,7 @@ jobs:
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@28218f9b04b4f3f62068d7b6ce6ca5b26e35336c
+        uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -75,7 +75,7 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
@@ -106,18 +106,22 @@ jobs:
         # against the sigstore community Fulcio instance.
         run: echo "${{ steps.meta.outputs.tags }}" | xargs -I {} cosign sign {}@${{ steps.build-and-push.outputs.digest }}
 
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
       ### NGINX container
+
+      - name: Cache Docker layers for NGINX container
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-nginx-cache
+          # Key is named differently to avoid collision
+          key: ${{ runner.os }}-multi-buildx-nginx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-multi-buildx-nginx
 
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata for NGINX container
         id: meta-nginx
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-nginx
 
@@ -125,15 +129,15 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image for NGINX container
         id: build-and-push-nginx
-        uses: docker/build-push-action@ac9327eae2b366085ac7f6a2d02df8aa8ead720a
+        uses: docker/build-push-action@v2
         with:
           context: .
           file: compose/production/nginx/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-nginx.outputs.tags }}
           labels: ${{ steps.meta-nginx.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=local,src=/tmp/.buildx-nginx-cache
+          cache-to: type=local,mode=max,dest=/tmp/.buildx-nginx-cache-new
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
@@ -147,3 +151,10 @@ jobs:
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
         run: echo "${{ steps.meta-nginx.outputs.tags }}" | xargs -I {} cosign sign {}@${{ steps.build-and-push-nginx.outputs.digest }}
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          rm -rf /tmp/.buildx-nginx-cache
+          mv /tmp/.buildx-nginx-cache-new /tmp/.buildx-nginx-cache
