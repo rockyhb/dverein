@@ -141,6 +141,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           flavor: |
             suffix=-test
+            latest=false
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
@@ -286,14 +287,14 @@ jobs:
 
       - name: Run DB Migrations
         run:  >
-          DJANGO_IMAGE="${{ needs.build.outputs.testimage }}"
-          POSTGRES_IMAGE="${{ needs.build.outputs.pgimage }}"
-          NGINX_IMAGE="${{ needs.build.outputs.nginximage }}"
+          DJANGO_IMAGE="$(echo ${{ needs.build.outputs.testimage }} | awk '{ print $1 }')"
+          POSTGRES_IMAGE="$(echo ${{ needs.build.outputs.pgimage }} | awk '{ print $1 }')"
+          NGINX_IMAGE="$(echo ${{ needs.build.outputs.nginximage }} | awk '{ print $1 }')"
           docker-compose -f ci.yml run --rm django python manage.py migrate
 
       - name: Run Django Tests
         run:  >
-          DJANGO_IMAGE="${{ needs.build.outputs.testimage }}"
-          POSTGRES_IMAGE="${{ needs.build.outputs.pgimage }}"
-          NGINX_IMAGE="${{ needs.build.outputs.nginximage }}"
+          DJANGO_IMAGE="$(echo ${{ needs.build.outputs.testimage }} | awk '{ print $1 }')"
+          POSTGRES_IMAGE="$(echo ${{ needs.build.outputs.pgimage }} | awk '{ print $1 }')"
+          NGINX_IMAGE="$(echo ${{ needs.build.outputs.nginximage }} | awk '{ print $1 }')"
           docker-compose -f ci.yml run django pytest
