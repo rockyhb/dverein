@@ -268,11 +268,13 @@ jobs:
   pytest:
     runs-on: ubuntu-latest
 
+    needs: build
+
     steps:
 
       - name: Test
         run: >
-          echo "${{ steps.meta-test.outputs.tags }}"
+          echo "${{ needs.build.steps.meta-test.outputs.tags }}"
 
       - name: Checkout Code Repository
         uses: actions/checkout@v3

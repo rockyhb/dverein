@@ -1,0 +1,38 @@
+version: '3'
+
+volumes:
+  ci_postgres_data: {}
+  ci_postgres_data_backups: {}
+  ci_traefik: {}
+  ci_django_media: {}
+
+services:
+  django:
+    image: "${DJANGO_IMAGE}"
+    volumes:
+      - ci_django_media:/app/dverein/media
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - ./.envs/.local/.django
+      - ./.envs/.local/.postgres
+    command: /start
+
+  postgres:
+    image: "${POSTGRES_IMAGE}"
+    volumes:
+      - ci_postgres_data:/var/lib/postgresql/data
+      - ci_postgres_data_backups:/backups
+    env_file:
+      - ./.envs/.local/.postgres
+
+  redis:
+    image: redis:6
+
+  nginx:
+    image: "${NGINX_IMAGE}"
+    depends_on:
+      - django
+    volumes:
+      - ci_django_media:/usr/share/nginx/media:ro
