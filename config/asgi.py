@@ -1,5 +1,5 @@
 """
-ASGI config for Djange Verein project.
+ASGI config for Django Verein project.
 
 It exposes the ASGI callable as a module-level variable named ``application``.
 

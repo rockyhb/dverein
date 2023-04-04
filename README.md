@@ -1,4 +1,4 @@
-# Djange Verein
+# Django Verein
 
 Django based version of jverein
 

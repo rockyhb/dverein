@@ -26,7 +26,7 @@ django.setup()
 
 # -- Project information -----------------------------------------------------
 
-project = "Djange Verein"
+project = "Django Verein"
 copyright = """2023, Claas Rockmann-Buchterkirche"""
 author = "Claas Rockmann-Buchterkirche"
 
