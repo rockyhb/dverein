@@ -52,6 +52,8 @@ jobs:
 
     outputs:
       testimage: "${{ steps.meta-test.outputs.tags }}"
+      pgimage: "${{ steps.meta-pg.outputs.tags }}"
+      nginximage: "${{ steps.meta-nginx.outputs.tags }}"
 
     steps:
       - name: Checkout repository
@@ -284,14 +286,14 @@ jobs:
 
       - name: Run DB Migrations
         run:  >
-          DJANGO_IMAGE=ghcr.io/rockyhb/dverein:main-test
-          POSTGRES_IMAGE=ghcr.io/rockyhb/dverein-pg:main
-          NGINX_IMAGE=ghcr.io/rockyhb/dverein-nginx:main
+          DJANGO_IMAGE="${{ needs.build.outputs.testimage }}"
+          POSTGRES_IMAGE="${{ needs.build.outputs.pgimage }}"
+          NGINX_IMAGE="${{ needs.build.outputs.nginximage }}"
           docker-compose -f ci.yml run --rm django python manage.py migrate
 
       - name: Run Django Tests
         run:  >
-          DJANGO_IMAGE=ghcr.io/rockyhb/dverein:main-test
-          POSTGRES_IMAGE=ghcr.io/rockyhb/dverein-pg:main
-          NGINX_IMAGE=ghcr.io/rockyhb/dverein-nginx:main
+          DJANGO_IMAGE="${{ needs.build.outputs.testimage }}"
+          POSTGRES_IMAGE="${{ needs.build.outputs.pgimage }}"
+          NGINX_IMAGE="${{ needs.build.outputs.nginximage }}"
           docker-compose -f ci.yml run django pytest
