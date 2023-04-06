@@ -110,7 +110,7 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: compose/production/django/Dockerfile
@@ -215,7 +215,7 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image
         id: build-and-push-test
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: compose/local/django/Dockerfile
@@ -316,7 +316,7 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image for NGINX container
         id: build-and-push-nginx
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: compose/production/nginx/Dockerfile
@@ -417,7 +417,7 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image for POSTGRESQL container
         id: build-and-push-pg
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           context: .
           file: compose/production/postgres/Dockerfile
